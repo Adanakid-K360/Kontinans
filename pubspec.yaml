@@ -1,0 +1,38 @@
+name: kontinars_forms
+description: Kontinans Derneği formları için WebView uygulaması
+publish_to: "none"
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  webview_flutter: ^4.5.0
+  url_launcher: ^6.3.0
+  connectivity_plus: ^6.0.5
+  video_player: ^2.9.2
+  http: ^1.2.2
+  webview_cookie_manager: ^2.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1   # <-- ikon oluşturma için eklendi
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/intro.mp4
+    - assets/images/icon_menu.png
+    - assets/images/side_logo.png
+    - assets/images/app_icon_ii.png    # <-- ikon dosyanı da assetlere ekledim
+
+# Uygulama ikonu ayarları
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/app_icon.png"
