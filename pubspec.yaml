@@ -2,6 +2,8 @@ name: kontinars_forms
 description: Kontinans Derneği formları için WebView uygulaması
 publish_to: "none"
 
+version: 1.0.0+2      # ← BUNU EKLE
+
 environment:
   sdk: ">=3.3.0 <4.0.0"
 
