@@ -116,6 +116,9 @@ class _WebShellState extends State<WebShell> {
   final ValueNotifier<double> _progress = ValueNotifier<double>(0);
   final ValueNotifier<bool> _isOnline = ValueNotifier<bool>(true);
 
+  // WebView içerik yüklerken hata alırsa (ATS, SSL, sunucu vs.)
+  final ValueNotifier<bool> _hasWebError = ValueNotifier<bool>(false);
+
   Map<String, dynamic>? _user; // null => giriş yok / okunamadı
   final _cookieManager = WebviewCookieManager();
 
@@ -128,10 +131,18 @@ class _WebShellState extends State<WebShell> {
       ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onPageStarted: (url) {
+            _progress.value = 0;
+            _hasWebError.value = false; // Yeni sayfa yüklenirken hata bayrağını sıfırla
+          },
           onProgress: (p) => _progress.value = p / 100.0,
-          onWebResourceError: (e) => _isOnline.value = false,
+          onWebResourceError: (e) {
+            // İnternet var ama WebView içerik yüklerken hata aldıysa buraya düşer
+            _hasWebError.value = true;
+          },
           onNavigationRequest: _handleNavigation,
           onPageFinished: (url) async {
+            _progress.value = 1;
             // Sayfa yüklenince JS’ten kullanıcı bilgisi almaya çalış
             await _fetchUserFromJSOnce();
           },
@@ -181,7 +192,7 @@ class _WebShellState extends State<WebShell> {
   Future<void> _openDrawer() async {
     await _fetchUserFromJSOnce(); // Önce JS
     if (_user == null) {
-      await _fetchUserFromWP();   // JS yoksa REST fallback
+      await _fetchUserFromWP(); // JS yoksa REST fallback
     }
     _scaffoldKey.currentState?.openEndDrawer();
   }
@@ -311,6 +322,7 @@ class _WebShellState extends State<WebShell> {
         valueListenable: _isOnline,
         builder: (_, online, __) {
           if (!online) {
+            // Cihazda gerçekten internet yoksa
             return _OfflineView(onRetry: () async {
               final connectivity = await Connectivity().checkConnectivity();
               if (connectivity != ConnectivityResult.none) {
@@ -319,9 +331,26 @@ class _WebShellState extends State<WebShell> {
               }
             });
           }
-          return RefreshIndicator(
-            onRefresh: _pullToRefresh,
-            child: WebViewWidget(controller: _controller),
+
+          // İnternet var ama WebView içerik yüklerken hata aldıysa (SSL, sunucu vs.)
+          return ValueListenableBuilder<bool>(
+            valueListenable: _hasWebError,
+            builder: (_, hasError, __) {
+              if (hasError) {
+                return _WebErrorView(
+                  onRetry: () {
+                    _hasWebError.value = false;
+                    _controller.reload();
+                  },
+                );
+              }
+
+              // Her şey normalse WebView'i göster
+              return RefreshIndicator(
+                onRefresh: _pullToRefresh,
+                child: WebViewWidget(controller: _controller),
+              );
+            },
           );
         },
       ),
@@ -397,17 +426,20 @@ class _SidePanel extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
                   ListTile(
-                    title: const Text('KVKK Aydınlatma Metni', textAlign: TextAlign.center,),
+                    title: const Text(
+                      'KVKK Aydınlatma Metni',
+                      textAlign: TextAlign.center,
+                    ),
                     onTap: onShowKvkk, // <— her zaman var
                   ),
-
                   if (user != null)
                     ListTile(
-                      title: const Text('Oturumu kapat', textAlign: TextAlign.center,),
+                      title: const Text(
+                        'Oturumu kapat',
+                        textAlign: TextAlign.center,
+                      ),
                       onTap: onLogout, // <— profilin altında logout
                     ),
-
-
                 ],
               ),
             ),
@@ -565,6 +597,45 @@ class _OfflineView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             FilledButton(onPressed: onRetry, child: const Text('Tekrar dene')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ------------------------------
+/// Web hata ekranı (sunucu / SSL / domain hatası vs.)
+/// ------------------------------
+class _WebErrorView extends StatelessWidget {
+  const _WebErrorView({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 64),
+            const SizedBox(height: 12),
+            const Text(
+              'Formlara şu anda ulaşılamıyor.',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Lütfen internet bağlantınızı ve sunucu erişimini kontrol edip tekrar deneyin.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: onRetry,
+              child: const Text('Tekrar dene'),
+            ),
           ],
         ),
       ),
